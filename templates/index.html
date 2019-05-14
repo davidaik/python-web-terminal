@@ -1,64 +1,103 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
     <title>Socket.IO chat</title>
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font: 13px Helvetica, Arial; }
-      form { background: #000; padding: 3px; position: ; bottom: 0; width: 100%; }
-      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
-      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
-      #messages { list-style-type: none; margin: 0; padding: 0; }
-      #messages li { padding: 5px 10px; }
-      #messages li:nth-child(odd) { background: #eee; }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font: 13px Helvetica, Arial;
+      }
+      form {
+        background: #000;
+        padding: 3px;
+        bottom: 0;
+      }
+      form input {
+        border: 0;
+        padding: 10px;
+        width: 90%;
+        margin-right: 0.5%;
+      }
+      form button {
+        width: 9%;
+        background: rgb(130, 224, 255);
+        border: none;
+        padding: 10px;
+      }
+
+      #my-terminal {
+        margin-top: 32px;
+      }
     </style>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.5.0/css/jquery.terminal.min.css"
+      rel="stylesheet"
+    />
   </head>
   <body>
-    <ul id="messages"></ul>
     <form id="editor" action="">
-      <textarea id="m" autocomplete="off" rows="30" cols="70" style="width:100%;"> </textarea><button>Send</button>
+      <textarea
+        id="m"
+        autocomplete="off"
+        rows="10"
+        cols="50"
+        style="width:100%;"
+      ></textarea
+      ><button>Run</button>
     </form>
 
-    <form id="terminal" action="">
-        <textarea id="terminal-ta" autocomplete="off" rows="30" cols="70" style="width:100%;"> </textarea><button>Send</button>
-      </form>
+    <div id="my-terminal"></div>
 
     <script src="{{ url_for('static', filename='socket.io.js')}}"></script>
     <script
       src="https://code.jquery.com/jquery-3.4.1.min.js"
       integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
-      crossorigin="anonymous"></script>
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.5.0/js/jquery.terminal.min.js"></script>
 
-      <script>
+    <script>
+      var socket = io();
+
+      $(function() {
         var socket = io();
-
-          $(function () {
-            var socket = io();
-            $('#editor').submit(function(e){
-              e.preventDefault(); // prevents page reloading
-              var encoded_string = btoa($('#m').val());
-              console.log(encoded_string);
-              socket.emit('run_program', encoded_string);
-              //$('#m').val('');
-              return false;
-            });
-
-            $('#terminal').submit(function(e){
-              e.preventDefault(); // prevents page reloading
-              var encoded_string = btoa($('#terminal-ta').val());
-              socket.emit('user_input', $('#terminal-ta').val());
-              //$('#m').val('');
-              return false;
-            });
+        var terminal;
+        $("#editor").submit(function(e) {
+          e.preventDefault(); // prevents page reloading
+          var encoded_string = btoa($("#m").val());
+          console.log(encoded_string);
+          socket.emit("run_program", encoded_string);
+          //$('#m').val('');
+          return false;
+        });
 
 
 
+        jQuery(function($, undefined) {
+          terminal = $("#my-terminal").terminal(
+            function(command) {
+              if (command !== "") {
+                socket.emit("user_input", command);
+              }
+            },
+            {
+              greetings: "Running program...",
+              name: "python_terminal",
+              height: 200,
+              width: 600,
+              prompt: ""
+            }
+          );
+        });
 
-            socket.on('stdout', function(msg){
-              console.log(msg.data);
-            })
-          });
-          
-        </script>
+        socket.on("stdout", function(msg) {
+          terminal.echo(msg.data);
+        });
+      });
+    </script>
   </body>
 </html>
