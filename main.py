@@ -1,9 +1,12 @@
 import socketio
 from flask import Flask, render_template, url_for
+import os
 import sys
 import subprocess
 
-import thread
+from threading import Thread
+import fcntl
+import _thread as thread
 import time
 
 sio = socketio.Server(async_mode='threading')
@@ -16,65 +19,23 @@ def get_index():
     return render_template('index.html')
 
 
-
-
-def exec_code(code_string):
-    from cStringIO import StringIO
-    old_stdout = sys.stdout
-    redirected_output = sys.stdout = StringIO()
-    exec(code_string)
-    sys.stdout = old_stdout
-    print(redirected_output.getvalue())
-
-
-
-
-
-
 @sio.on('connect')
 def connect(sid, environ):
-    print('CONNECTED!!!!!!!!!!!!!! ')
+    print('User connected!')
     sys.stdout.flush()
-    '''
-    proc = subprocess.Popen(['python', '-u', 'test.py'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1)
-    thread.start_new_thread(prompt_user, (proc, ))
-    proc.stdin.write("David")
-    print proc.communicate()[0]
-    proc.stdin.close()
-
-    while True:
-        line = proc.stdout.readline()
-        if line != '':
-            print(line.rstrip())
-            sys.stdout.flush()
-        else:
-            break
-    '''
 
 
 @sio.on('disconnect')
 def disconnect(sid):
-    print('disconnect ', sid)
+    print('User disconnected!')
+    sys.stdout.flush()
 
 
 @sio.on('run_program')
 def run_program(sid, data):
     sio.save_session(sid, {'user_input_line': None})
-    proc = subprocess.Popen(['python', '-u', 'run_program.py', data], stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1)
+    proc = subprocess.Popen(['python3', 'run_program.py', data], stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0)
     thread.start_new_thread(prompt_user, (sid, proc, ))
-
-
-    # proc.stdin.write("David")
-    # print proc.communicate()[0]
-    # proc.stdin.close()
-    '''while True:
-        line = proc.stdout.readline()
-        if line != '':
-            # print(line.rstrip())
-            # sys.stdout.flush()
-            sio.emit('stdout', {'data': line})
-        else:
-            break'''
 
 
 @sio.on('user_input')
@@ -85,22 +46,32 @@ def user_input(sid, data):
 def prompt_user(sid, proc):
     while True:
         if proc.poll() is not None:
-            print('HEFRE')
+            print('Process already stopped')
             sys.stdout.flush()
             break
         session = sio.get_session(sid)
         user_input_line = session['user_input_line']
-
         if user_input_line:
-            line = proc.communicate(user_input_line)[0]
-        else:
-            line = proc.communicate('"hehehe"\n')[0]
+            proc.stdin.write('{}{}'.format(user_input_line,'\n').encode('utf-8'))
+            proc.stdin.flush()
+        line = non_block_read(proc.stdout)
         if line:
-            sio.emit('stdout', {'data': line})
-            time.sleep(3)
+            sio.emit('stdout', {'data': line.decode('utf-8')})
+            time.sleep(1)
 
-    print('THREAD STOPPED')
-    sys.stdout.flush()
+
+'''
+Solution by Chase Seibert.
+https://chase-seibert.github.io/blog/2012/11/16/python-subprocess-asynchronous-read-stdout.html
+'''
+def non_block_read(stdout):
+    fd = stdout.fileno()
+    fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+    try:
+        return stdout.read()
+    except:
+        return ''
 
 
 if __name__ == '__main__':
