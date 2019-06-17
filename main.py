@@ -47,10 +47,12 @@ def prompt_user(sid, proc):
     while True:
         if proc.poll() is not None:
             print('Process already stopped')
+            sio.emit('stdout', {'data': 'Program finished'})
             sys.stdout.flush()
             break
         session = sio.get_session(sid)
         user_input_line = session['user_input_line']
+        sio.save_session(sid, {'user_input_line': None})
         if user_input_line:
             proc.stdin.write('{}{}'.format(user_input_line,'\n').encode('utf-8'))
             proc.stdin.flush()
