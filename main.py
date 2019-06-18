@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import socketio
 from flask import Flask, render_template, url_for
 import os
@@ -13,6 +15,7 @@ sio = socketio.Server(async_mode='threading')
 app = Flask(__name__)
 app.wsgi_app = socketio.Middleware(sio, app.wsgi_app)
 
+execute_python_version = 2
 
 @app.route('/')
 def get_index():
@@ -21,20 +24,25 @@ def get_index():
 
 @sio.on('connect')
 def connect(sid, environ):
-    print('User connected!')
+    # print('User connected!')
     sys.stdout.flush()
 
 
 @sio.on('disconnect')
 def disconnect(sid):
-    print('User disconnected!')
+    # print('User disconnected!')
     sys.stdout.flush()
 
 
 @sio.on('run_program')
 def run_program(sid, data):
     sio.save_session(sid, {'user_input_line': None})
-    proc = subprocess.Popen(['python3', 'run_program.py', data], stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0)
+    proc = None
+    if execute_python_version == 3:
+        proc = subprocess.Popen(['python3', 'run_program.py', data], stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0)
+    else:
+        proc = subprocess.Popen(['python2.7', '-u', 'run_program_2.py', data], stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1)
+    set_non_block(proc.stdout)
     thread.start_new_thread(prompt_user, (sid, proc, ))
 
 
@@ -46,7 +54,7 @@ def user_input(sid, data):
 def prompt_user(sid, proc):
     while True:
         if proc.poll() is not None:
-            print('Process already stopped')
+            # print('Process already stopped')
             sio.emit('stdout', {'data': 'Program finished'})
             sys.stdout.flush()
             break
@@ -56,20 +64,23 @@ def prompt_user(sid, proc):
         if user_input_line:
             proc.stdin.write('{}{}'.format(user_input_line,'\n').encode('utf-8'))
             proc.stdin.flush()
-        line = non_block_read(proc.stdout)
+        line = read(proc.stdout)
         if line:
             sio.emit('stdout', {'data': line.decode('utf-8')})
-            time.sleep(1)
+            time.sleep(0.2)
 
 
 '''
 Solution by Chase Seibert.
 https://chase-seibert.github.io/blog/2012/11/16/python-subprocess-asynchronous-read-stdout.html
 '''
-def non_block_read(stdout):
+def set_non_block(stdout):
     fd = stdout.fileno()
     fl = fcntl.fcntl(fd, fcntl.F_GETFL)
     fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+
+def read(stdout):
     try:
         return stdout.read()
     except:
