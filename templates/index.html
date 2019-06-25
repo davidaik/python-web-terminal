@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Socket.IO chat</title>
+    <title>Python Console</title>
     <style>
       * {
         margin: 0;
@@ -39,16 +39,14 @@
     />
   </head>
   <body>
-    <form id="editor" action="">
-      <textarea
-        id="m"
-        autocomplete="off"
-        rows="10"
-        cols="50"
-        style="width:100%;"
-      ></textarea
-      ><button>Run</button>
-    </form>
+    <textarea
+      id="editor"
+      autocomplete="off"
+      rows="10"
+      cols="50"
+      style="width:100%;"
+    ></textarea>
+    <button id="run-btn">Run</button>
 
     <div id="my-terminal"></div>
 
@@ -66,36 +64,46 @@
       $(function() {
         var socket = io();
         var terminal;
-        $("#editor").submit(function(e) {
-          e.preventDefault(); // prevents page reloading
-          var encoded_string = btoa($("#m").val());
-          console.log(encoded_string);
+        var running = false;
+
+        $("#run-btn").click(function() {
+          if (running) return;
+          var code = $("#editor")
+            .val();
+          if (!code || !code.match(/\S/g)) {
+            console.log("emptu");
+            return;
+          }
+          running = true;
+          terminal.clear();
+          terminal.echo("[RUNNING]\n");
+          var encoded_string = btoa(code); // Encode string
           socket.emit("run_program", encoded_string);
-          //$('#m').val('');
           return false;
         });
 
-
-
-        jQuery(function($, undefined) {
-          terminal = $("#my-terminal").terminal(
-            function(command) {
-              if (command !== "") {
-                socket.emit("user_input", command);
-              }
-            },
-            {
-              greetings: "Running program...",
-              name: "python_terminal",
-              height: 200,
-              width: 600,
-              prompt: ""
+        terminal = $("#my-terminal").terminal(
+          function(command) {
+            if (command !== "") {
+              socket.emit("user_input", command);
             }
-          );
-        });
+          },
+          {
+            greetings: "Your program output will be shown below...",
+            name: "python_terminal",
+            height: 200,
+            width: 600,
+            prompt: ""
+          }
+        );
 
         socket.on("stdout", function(msg) {
-          terminal.echo(msg.data);
+          if (msg.data.match(/program_finished/)) {
+            running = false;
+            terminal.echo("[PROGRAM FINISHED]");
+          } else {
+            terminal.echo(msg.data);
+          }
         });
       });
     </script>
