@@ -44,4 +44,6 @@ if __name__ == '__main__':
         print e
         sys.stdout.flush()
         pass
+
+    time.sleep(1) # Give the parent process time to read the stdout in case the program finishes too quickly
     program_running = False
